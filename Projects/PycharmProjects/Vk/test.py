@@ -1,28 +1,12 @@
 import vk
-#global token
-#session = vk.AuthSession('6618701', '79686098859', '1835645', scope='wall, messages')
-#session = vk.AuthSession(access_token = token )
-#vk_api = vk.API(session)
-
-#print(vk_api.users.get(user_id=151069916, fields='online, last_seen', v = 5.80))
-import urllib
-from urllib.request import urlopen
 import vkbot
 import sqlite3
 import Registration
 import time
 import telebot
-import os
-import re
 
-import json
 tokenT = "587800331:AAHxyJwy4p7k61iMqtF17HfQ9pV2mh0hqXw"
 bot = telebot.TeleBot(tokenT)
-#print(bot.get_me())
-
-
-
-
 
 @bot.message_handler(commands=['start'])
 def a(message):
@@ -46,55 +30,60 @@ def a(message):
 @bot.message_handler(commands=['chats'])
 def chat(message):#выводит список последних чатов
 
-    #tokenVK =
-    #name = []
-
     name = vkbot.chats(Registration.start(message))
     keyboard = telebot.types.InlineKeyboardMarkup()
-    #callback_button = telebot.types.InlineKeyboardButton(text='Нажмите что бы перейти к чату', callback_data="test")
-    i = 0
+
     for a in name:
         callback_button = telebot.types.InlineKeyboardButton(text=a , callback_data=name[a])
         keyboard.add(callback_button)
-        i+=1
+
 
     bot.send_message(message.chat.id, "Выберите чат", reply_markup=keyboard)
+
+
+@bot.message_handler(commands=['newmessage'])
+def newmessage(message):
+    token = vkbot.token(message.chat.id)
+    session = vk.AuthSession(access_token=token[0])
+    vk_api = vk.API(session)
+
+    name = vkbot.chats(Registration.start(message))
+    keyboard = telebot.types.InlineKeyboardMarkup()
+    i = 0
+    for a in name:
+        data = vk_api.messages.getHistory(offset=-1, count=1, start_message_id=-1, peer_id=name[a], v=5.38)
+        #print(data)
+        if len(data['items']) > 0:
+            #print(data['items'])
+            callback_button = telebot.types.InlineKeyboardButton(text=a, callback_data=name[a])
+            keyboard.add(callback_button)
+
+            i+=1
+
+        else:
+            break
+    if i > 0:
+        bot.send_message(message.chat.id, "Для вас есть новые сообщения в этих чатах", reply_markup=keyboard)
+    else:
+        bot.send_message(message.chat.id, "Новых сообщений нет")
+
+
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
     if call.message:
 
-
-        #print(call.data)
-        #bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Пыщь")
-        #print(call.data)
-
         conn = sqlite3.connect("vk.db")
         cursor = conn.cursor()
-
-        #a = str(call.data)
-        # a = [(token,idT)]
-        # cursor.execute(a)
-
         cursor.execute('UPDATE users SET chat=? WHERE id_in_telegram=?', (str(call.data), str(call.message.chat.id)))
         conn.commit()
-        #cursor.executemany("INSERT INTO users(chat) VALUES (?)", [call.data])
-        #bot.answer_callback_query(call.id, text="Чат выбран")
-
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Чат выбран \n Сообщения обновились")
         obnov(call.message.chat.id)
-
-
-
-
 
 @bot.message_handler(content_types=['text'])
 def handle_start(message):
 
-
-
-    #cursor.execute(sql, [(str(message.chat.id))])
-    # print(len(cursor.fetchall()[:]))
     tokenVK = Registration.start(message)
     if  tokenVK == '0':
         a = message.text.split('/')
@@ -105,21 +94,18 @@ def handle_start(message):
     else:
         if message.text == "Обновить сообщения":
             obnov(message.chat.id)
-                #bot.send_message(token[1], name_users['first_name'] + ' ' + name_users['last_name'] + ":  " + a['body'])
+
 
         else:
-            #obnov(message.chat.id)
-            import  vk
-            import vkbot
+
             token = vkbot.token(message.chat.id)
             session = vk.AuthSession(access_token=token[0])
             vk_api = vk.API(session)
-        #bot.send_message(message.from_user.id, "Сообщения обновляются", reply_markup=user_markup)
 
             vk_api.messages.send(peer_id=token[1], message=message.text, v=5.38)
 
 
-        #
+
 def obnov(message):
 
     token = vkbot.token(message)
@@ -127,15 +113,17 @@ def obnov(message):
     vk_api = vk.API(session)
     data = vk_api.messages.getHistory(offset=-200, count=200, start_message_id=-1, peer_id=token[1], v=5.38)
     for a in reversed(data['items']):
-        # print(a)
-        # print(a['user_id'])
+
 
         name_users = vk_api.users.get(user_ids=a['user_id'], fields='first_name,last_name', v=5.80)[0]
-        # print(name_users['first_name'] + ' ' + name_users['last_name'])
         bot.send_message(message,
                          name_users['first_name'] + ' ' + name_users['last_name'] + ":  " + a['body'])
         vk_api.messages.markAsRead(peer_id =token[1], v = 5.38 )
-        # print(a['body'])
+
+
+
+
+
 
 
 @bot.message_handler(content_types=[''])
@@ -143,10 +131,10 @@ def handle_start(message):
     pass
 
 
-#while True:
-#    try:
-bot.polling(none_stop=True, interval=0)
+while True:
+    try:
+        bot.polling(none_stop=True, interval=0)
 
-#    except Exception as e:
-#        print(e)
-#        time.sleep(5)
+    except Exception as e:
+        print(e)
+        time.sleep(5)
